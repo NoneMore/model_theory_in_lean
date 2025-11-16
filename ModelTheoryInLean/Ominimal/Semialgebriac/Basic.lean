@@ -546,16 +546,104 @@ lemma respects_partition_of_union {S T : Set α}
   · exact respects_partition_of_subset hA' hA
   · exact respects_partition_of_subset hB' hB
 
+/-- A singleton set respects the partition induced by itself. -/
+lemma respects_partition_singleton (a : α) :
+  RespectsPartition {a} (finset_to_partition_is_partition {a}) := by
+  rw [respects_partition_iff_respects_partition', RespectsPartition']
+  intro X hX
+  rcases hX with ((h | h) | rfl) | rfl
+  · simp at h ; subst h ; left ; simp
+    exact Finset.orderEmbOfFin_singleton a 0
+  · simp at h
+  · right ; simp ; apply le_of_eq
+    exact Finset.orderEmbOfFin_singleton a 0
+  · right ; simp ; apply le_of_eq ; symm
+    exact Finset.orderEmbOfFin_singleton a 0
+
 /-- If a set `S` is a component, then it respects a partition induced by some finite set. -/
 lemma respects_partition_of_is_component {S : Set α} (hS : IsComponent S) :
   ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A) := by
-  sorry
+  rcases hS with ⟨a,rfl⟩ | ⟨a,b,hab,rfl⟩ | ⟨a,rfl⟩ | ⟨a,rfl⟩ | rfl
+  · use {a}
+    exact respects_partition_singleton a
+  · use {a,b}
+    rw [respects_partition_iff_respects_partition', RespectsPartition']
+    intro X hX
+    by_cases hab' : a = b
+    · simp [hab']
+    apply hab.lt_of_ne at hab'
+    rw [finset_to_partition, sequence_to_partition.eq_def] at hX
+    split at hX
+    · grind
+    rename_i n f hf hn heq heq'
+    have : n = 1 := by
+      have : Finset.card {a,b} = 2 := by grind
+      grind
+    subst this
+    have : range (Finset.orderEmbOfFin {a, b} rfl) = ({a,b} : Finset α) := Finset.range_orderEmbOfFin {a, b} rfl
+    have f_range : range f = {a,b} := by grind
+    have h_mono : f 0 < f 1 := hf (by grind)
+    have h0_mem : f 0 ∈ ({a, b} : Set α) := by rw [← f_range]; exact mem_range_self 0
+    have h1_mem : f 1 ∈ ({a, b} : Set α) := by rw [← f_range]; exact mem_range_self 1
+    have f0 : f 0 = a := by grind
+    have f1 : f 1 = b := by grind
+    rcases hX with ((h | h) | rfl) | rfl
+    · simp at h
+      rcases h with h | h <;> right <;> simp [←h, ←f0, ←f1]
+    · simp at h ; rcases h with h | h ; simp [←f0, ←f1]
+    · right ; simp [←f0, ←f1]
+      refine disjoint_left.mpr ?_
+      intro x hx hx'
+      grind
+    · simp [←f0, ←f1] ; right
+      refine disjoint_left.mpr ?_
+      intro x hx hx'
+      grind
+  · use {a}
+    rw [respects_partition_iff_respects_partition', RespectsPartition']
+    intro X hX
+    rcases hX with ((h | h) | rfl) | rfl
+    · simp at h ; rw [←h] ; right ; simp ; apply le_of_eq
+      exact Finset.orderEmbOfFin_singleton a 0
+    · simp at h
+    · simp ; right ; apply le_of_eq
+      exact Finset.orderEmbOfFin_singleton a 0
+    · simp ; left ; apply le_of_eq ; symm
+      exact Finset.orderEmbOfFin_singleton a 0
+  · use {a}
+    rw [respects_partition_iff_respects_partition', RespectsPartition']
+    intro X hX
+    rcases hX with ((h | h) | rfl) | rfl
+    · simp at h ; rw [←h] ; right ; simp ; apply le_of_eq ; symm
+      exact Finset.orderEmbOfFin_singleton a 0
+    · simp at h
+    · simp ; left ; apply le_of_eq
+      exact Finset.orderEmbOfFin_singleton a 0
+    · simp ; right ; apply le_of_eq ; symm
+      exact Finset.orderEmbOfFin_singleton a 0
+  · use ∅
+    simp [respects_partition_iff_respects_partition', RespectsPartition']
 
 /-- For any semialgebraic set `S`, there exists some finite set `A`
     such that `S` respects the partition induced by `A`. -/
 lemma exists_finset_respects_partition_of_semialgebriac (S : Set α) (hS : IsSemialgebraic S) :
   ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A) := by
-  sorry
+  classical
+  obtain ⟨F, hF_comp, rfl⟩ := hS
+  induction F using Finset.induction with
+  | empty =>
+    use ∅
+    rw [respects_partition_iff_respects_partition']
+    intro X hX
+    have : X = univ := by
+      simp [finset_to_partition, sequence_to_partition] at hX
+      exact hX
+    rw [this] ; right ; simp
+  | @insert s G _ ih =>
+    have hG: ∀ A ∈ G, IsComponent A := by grind
+    have hs : IsComponent s := by grind
+    simp
+    exact respects_partition_of_union (respects_partition_of_is_component hs) (ih hG)
 
 /-- For semialgebraic set `S`, there exists some finite set `A` of minimal size,
     such that `S` respects the partition induced by `A` -/
