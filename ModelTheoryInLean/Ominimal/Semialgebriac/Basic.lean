@@ -113,7 +113,7 @@ Given `n` points `f 0, f 1, ..., f (n-1)`, this function generates a partition o
 into `2n + 1` sets. The points are assumed to be sorted.
 The partition is `(-∞, f 0), {f 0}, (f 0, f 1), {f 1}, ..., {f (n-1)}, (f (n-1), ∞)`.
 -/
-noncomputable def points_to_partition :Set (Set α) :=
+noncomputable def sequence_to_partition :Set (Set α) :=
 match n with
 | 0 => {univ}
 | n + 1 =>
@@ -128,19 +128,18 @@ Given a finite set of points `F`, this function induces a partition of `α` into
 open intervals and singletons determined by the points in `F`.
 -/
 noncomputable def finset_to_partition (F : Finset α) : Set (Set α) :=
-  let f := Finset.orderEmbOfFin F (rfl)
-  points_to_partition f (OrderEmbedding.strictMono f)
+  sequence_to_partition (Finset.orderEmbOfFin F (rfl)) (OrderEmbedding.strictMono (Finset.orderEmbOfFin F (rfl)))
 
 lemma disjoint_of_ne {A B : Set α} (h_ne : A ≠ B)
-  (hA : A ∈ points_to_partition f hf) (hB : B ∈ points_to_partition f hf) :
+  (hA : A ∈ sequence_to_partition f hf) (hB : B ∈ sequence_to_partition f hf) :
   Disjoint A B := by
   cases n with
   | zero =>
-    simp [points_to_partition] at hA hB
+    simp [sequence_to_partition] at hA hB
     subst hA hB
     contradiction
   | succ n =>
-    simp [points_to_partition] at hA hB
+    simp [sequence_to_partition] at hA hB
     have hf' : Monotone f := StrictMono.monotone hf
     rcases hA with rfl | rfl | ⟨i, rfl⟩ | ⟨i, rfl⟩ <;>
     rcases hB with rfl | rfl | ⟨j, rfl⟩ | ⟨j, rfl⟩
@@ -195,8 +194,8 @@ lemma disjoint_of_ne {A B : Set α} (h_ne : A ≠ B)
       · simp ; left ; right
         exact hf' h₂
 
-lemma points_to_partition_pairwise_disjoint :
-  (points_to_partition f hf).PairwiseDisjoint id := by
+lemma sequence_to_partition_pairwise_disjoint :
+  (sequence_to_partition f hf).PairwiseDisjoint id := by
   rw [pairwiseDisjoint_iff]
   intro A hA B hB h_ne
   contrapose! h_ne
@@ -204,8 +203,8 @@ lemma points_to_partition_pairwise_disjoint :
   apply disjoint_iff_inter_eq_empty.mp
   exact disjoint_of_ne f hf h_ne hA hB
 
-lemma points_to_partition_sUnion_eq_univ :
-  ⋃₀ (points_to_partition f hf) = univ := by
+lemma sequence_to_partition_sUnion_eq_univ :
+  ⋃₀ (sequence_to_partition f hf) = univ := by
   refine sUnion_eq_univ_iff.mpr ?_
   intro a
   cases n with
@@ -218,13 +217,13 @@ lemma points_to_partition_sUnion_eq_univ :
     by_cases ha₁ : ∃ i, f i = a
     · rcases ha₁ with ⟨i,hai⟩
       use {f i}
-      exact ⟨by simp [points_to_partition], id (Eq.symm hai)⟩
+      exact ⟨by simp [sequence_to_partition], id (Eq.symm hai)⟩
     · by_cases ha₂ : a < f 0
       · use Iio (f 0)
-        exact ⟨by simp [points_to_partition], ha₂⟩
+        exact ⟨by simp [sequence_to_partition], ha₂⟩
       · by_cases ha₃ : f (Fin.last n) < a
         · use Ioi (f (Fin.last n))
-          refine ⟨by simp [points_to_partition], ha₃⟩
+          refine ⟨by simp [sequence_to_partition], ha₃⟩
         have : ∃ i, f i < a ∧ a < f (i+1) := by
           let S := { i : Fin (n + 1) | f i < a }
           have hS_nonempty : S.Nonempty := ⟨0, lt_of_le_of_ne (not_lt.mp ha₂) (fun h => ha₁ ⟨0, h⟩)⟩
@@ -257,7 +256,7 @@ lemma points_to_partition_sUnion_eq_univ :
         rcases this with ⟨i, hai₁, hai₂⟩
         use Ioo (f i) (f (i + 1))
         constructor
-        · simp [points_to_partition]
+        · simp [sequence_to_partition]
           right ; right ; right
           have : i < Fin.last n := by
             rw [←hf.lt_iff_lt]
@@ -269,19 +268,19 @@ lemma points_to_partition_sUnion_eq_univ :
         · exact ⟨hai₁,hai₂⟩
 
 
-lemma points_to_partition_is_partition :
-  IsPartition (points_to_partition f hf) := by
+lemma sequence_to_partition_is_partition :
+  IsPartition (sequence_to_partition f hf) := by
   -- We proceed by cases on n.
   apply PairwiseDisjoint.isPartition_of_exists_of_ne_empty
-  · exact points_to_partition_pairwise_disjoint f hf
+  · exact sequence_to_partition_pairwise_disjoint f hf
   · intro a
     refine mem_sUnion.mp ?_
-    rw [points_to_partition_sUnion_eq_univ]
+    rw [sequence_to_partition_sUnion_eq_univ]
     trivial
   · cases n with
-    | zero => simp [points_to_partition] ; exact empty_ne_univ
+    | zero => simp [sequence_to_partition] ; exact empty_ne_univ
     | succ n =>
-      simp [points_to_partition]
+      simp [sequence_to_partition]
       refine ⟨nonempty_iff_empty_ne.mp nonempty_Ioi, nonempty_iff_empty_ne.mp nonempty_Iio, ?_⟩
       intro i
       refine nonempty_iff_ne_empty'.mp (nonempty_Ioo_subtype ?_)
@@ -290,8 +289,7 @@ lemma points_to_partition_is_partition :
 
 lemma finset_to_partition_is_partition (F : Finset α) :
   IsPartition (finset_to_partition F) := by
-  unfold finset_to_partition
-  exact points_to_partition_is_partition _ _
+  exact sequence_to_partition_is_partition _ _
 
 end partition
 /--
@@ -304,7 +302,7 @@ def RespectsPartition (S : Set α) {C : Set (Set α)} (_ : IsPartition C) : Prop
 A set `S` respects a partition `C` if for any set `X` in the partition, `X` is either a subset
 of `S` or disjoint from `S`.
 -/
-def RespectsPartition' (S : Set α) {C : Set (Set α)} (_ : IsPartition C) : Prop :=
+def RespectsPartition' (S : Set α) {C : Set (Set α)} (hC : IsPartition C) : Prop :=
   ∀ X ∈ C, X ⊆ S ∨ Disjoint X S
 
 lemma respects_partition_iff_respects_partition' (S : Set α) {C : Set (Set α)}
@@ -360,29 +358,178 @@ lemma respects_partition_of_refinement {S : Set α} {C D : Set (Set α)}
     right
     exact Disjoint.mono_left hdc hSc
 
+/-- If the range of a strictly increasing sequence `f` is a subset of the range of `g`,
+    then the partition induced by `g` is a refinement of the partition induced by `f`. -/
+lemma partition_is_refinement_of_range_subset {n m : ℕ} {f : Fin n → α} {g : Fin m → α}
+    (hf : StrictMono f) (hg : StrictMono g) (h_range : Set.range f ⊆ Set.range g) :
+    ∀ d ∈ sequence_to_partition g hg, ∃ c ∈ sequence_to_partition f hf, d ⊆ c := by
+  intro d hd
+  have hnm : n ≤ m := by
+    have card_f : Fintype.card (Set.range f) = n := by
+      simp [card_range_of_injective hf.injective]
+    have card_g : Fintype.card (Set.range g) = m := by
+      simp [card_range_of_injective hg.injective]
+    have : Fintype.card (Set.range f) ≤ Fintype.card (Set.range g) := by exact card_le_card h_range
+    rwa [card_f, card_g] at this
+  cases n with
+  | zero =>
+    simp [sequence_to_partition]
+  | succ n =>
+    cases m with
+    | zero => exfalso ; exact Nat.not_succ_le_zero n hnm
+    | succ m =>
+      simp [sequence_to_partition] at *
+      rcases hd with (h_Ioi | h_Iio | ⟨y, h_pt⟩ | ⟨y, h_Ioo⟩)
+      · left
+        simp [h_Ioi]
+        obtain ⟨i, hi⟩ := h_range (mem_range_self (Fin.last n))
+        rw [←hi]
+        exact StrictMono.monotone hg (Fin.le_last i)
+      · right ; left
+        simp [h_Iio]
+        obtain ⟨i, hi⟩ := h_range (mem_range_self 0)
+        rw [←hi]
+        exact StrictMono.monotone hg (Fin.zero_le i)
+      · by_cases h : ∃ j, f j = g y
+        · rcases h with ⟨j,hj⟩
+          right ; right ;
+          use {f j}
+          constructor
+          · left ; use j
+          rw [←h_pt, hj]
+        simp at h
+        let gyL := { i | f i < g y}
+        let gyR := { i | f i > g y}
+        by_cases hL : gyL = ∅
+        · right ; left
+          simp [h_pt.symm]
+          contrapose! hL
+          use 0
+          exact lt_of_le_of_ne hL (h 0)
+        by_cases hR : gyR = ∅
+        · left
+          simp [h_pt.symm]
+          contrapose! hR
+          use Fin.last n
+          refine lt_of_le_of_ne hR ?_
+          exact fun a ↦ h (Fin.last n) (id (Eq.symm a))
+        right ; right
+        apply nonempty_iff_ne_empty.mpr at hL
+        let x := gyL.toFinset.max' (toFinset_nonempty.mpr hL)
+        have hx : x ∈ gyL := by
+          rw [←mem_toFinset]
+          exact Finset.max'_mem gyL.toFinset (toFinset_nonempty.mpr hL)
+        have hx' : x < Fin.last n := by
+          apply lt_of_le_of_ne (Fin.le_last x)
+          intro hxeq
+          obtain ⟨j, hj⟩ := nonempty_iff_ne_empty.mpr hR
+          have : f x < f j := lt_trans hx hj
+          rw [hf.lt_iff_lt, hxeq] at this
+          exact (lt_of_le_of_lt (Fin.le_last j) this).false
+        use Ioo (f x) (f (x + 1))
+        constructor
+        · right
+          let x' := Fin.castLT x hx'
+          use x'
+          congr
+          refine Fin.eq_of_val_eq ?_
+          exact Eq.symm (Fin.val_add_one_of_lt hx')
+        subst h_pt ; simp
+        refine ⟨hx,?_⟩
+        apply lt_of_le_of_ne
+        · by_contra h'
+          have : x + 1 ∈ gyL := lt_of_not_ge h'
+          have h_le : x + 1 ≤ x := Finset.le_max' (gyL.toFinset) (x+1) (Set.mem_toFinset.mpr this)
+          contrapose! h_le
+          exact Fin.lt_add_one_iff.mpr hx'
+        exact fun a ↦ h (x + 1) (id (Eq.symm a))
+      · subst h_Ioo
+        obtain ⟨i,hi⟩ := mem_range.mp (h_range (mem_range_self 0))
+        obtain ⟨j,hj⟩ := mem_range.mp (h_range (mem_range_self (Fin.last n)))
+        rw [←hi, ←hj]
+        by_cases hl : y.succ ≤ i
+        · right ; left ; simp [Ioo,Iio] ; intro a ha ha'
+          exact lt_of_lt_of_le ha' (hg.monotone hl)
+        by_cases hr : j ≤ y.castSucc
+        · left ; simp [Ioo,Ioi] ; intro a ha ha'
+          refine lt_of_le_of_lt (hg.monotone hr) ha
+        right ; right
+        let yL := { i | f i ≤ g y.castSucc }
+        let yR := { i | g y.succ ≤ f i }
+        have hyL : yL.Nonempty := by
+          have : 0 ∈ yL := by
+            simp [yL] ; rw [←hi] ; apply hg.monotone
+            exact Fin.not_lt.mp hl
+          exact nonempty_of_mem this
+        let x := yL.toFinset.max' (toFinset_nonempty.mpr hyL)
+        have hx : x ∈ yL := by
+          rw [←mem_toFinset]
+          exact Finset.max'_mem yL.toFinset (toFinset_nonempty.mpr hyL)
+        have hx' : x < Fin.last n := by
+          rw [←hf.lt_iff_lt, ←hj]
+          exact lt_of_le_of_lt hx (hg (Fin.not_le.mp hr))
+        use Ioo (f x) (f (x + 1))
+        constructor
+        · right
+          use Fin.castLT x hx'
+          simp ; congr
+          refine Fin.eq_of_val_eq ?_
+          exact Eq.symm (Fin.val_add_one_of_lt hx')
+        simp [Ioo] ; intro a ha ha'
+        constructor
+        · exact lt_of_le_of_lt hx ha
+        · apply lt_of_lt_of_le ha'
+          by_contra h
+          apply lt_of_not_ge at h
+          obtain ⟨k,hk⟩ := mem_range.mp (h_range (mem_range_self (x + 1)))
+          rw [←hk] at h
+          apply hg.lt_iff_lt.mp at h
+          apply Fin.le_castSucc_iff.mpr at h
+          apply hg.monotone at h
+          rw [hk] at h
+          change (x + 1) ∈ yL at h
+          have : x + 1 ≤ x := Finset.le_max' (yL.toFinset) (x+1) (Set.mem_toFinset.mpr h)
+          contrapose! this
+          exact Fin.lt_add_one_iff.mpr hx'
+
+/-- If a finset `A` is a subset of `B`, then the range of the induced strictly increasing
+    sequence from `A` is a subset of the range of the induced sequence from `B`. -/
+lemma range_orderEmbOfFin_subset_of_subset (A B : Finset α) (hAB : A ⊆ B) :
+    Set.range (Finset.orderEmbOfFin A rfl) ⊆ Set.range (Finset.orderEmbOfFin B rfl) := by
+  simp ; exact hAB
+
 /-- If a finite set `A` is a subset of `B`, then the partition induced by `B`
     is a refinement of the partition induced by `A`. -/
 lemma finset_to_partition_is_refinement_of_subset (A B : Finset α) (hAB : A ⊆ B) :
     ∀ d ∈ finset_to_partition B, ∃ c ∈ finset_to_partition A, d ⊆ c := by
-  intro d hd
-  by_cases hA_empty : A = ∅
-  · rw [hA_empty] ; simp [finset_to_partition, points_to_partition]
-  simp only [finset_to_partition, points_to_partition] at hd
-  split at hd
-  · have hB_card_pos : B.card ≠ 0 := by
-      refine Finset.card_ne_zero.mpr ?_
-      have hA_ne : A.Nonempty := Finset.nonempty_iff_ne_empty.mpr hA_empty
-      exact Finset.Nonempty.mono hAB hA_ne
-    exfalso
-    (expose_names; exact hB_card_pos heq)
-  · rename_i n f hf heq heq₂ heq₃
-    have : range f = B := by sorry
-    sorry
+  unfold finset_to_partition
+  let fA := Finset.orderEmbOfFin A rfl
+  let fB := Finset.orderEmbOfFin B rfl
+  have hfA : StrictMono fA := OrderEmbedding.strictMono fA
+  have hfB : StrictMono fB := OrderEmbedding.strictMono fB
+  have h_range : Set.range fA ⊆ Set.range fB := by
+    exact range_orderEmbOfFin_subset_of_subset A B hAB
+  exact partition_is_refinement_of_range_subset hfA hfB h_range
 
-/-- If a set `S` is a component, then it respects a partition induced by some finite set. -/
-lemma respects_partition_of_is_component {S : Set α} (hS : IsComponent S) :
-  ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A) := by
-  sorry
+/-- If a set `S` respects the partition induced by `A`, and `A ⊆ B`,
+    then `S` also respects the partition induced by `B`. -/
+lemma respects_partition_of_subset {S : Set α} {A B : Finset α} (hAB : A ⊆ B)
+    (hS : RespectsPartition S (finset_to_partition_is_partition A)) :
+    RespectsPartition S (finset_to_partition_is_partition B) := by
+  exact respects_partition_of_refinement
+    (finset_to_partition_is_partition A)
+    (finset_to_partition_is_partition B)
+    (finset_to_partition_is_refinement_of_subset A B hAB)
+    hS
+
+/-- If two sets `S` and `T` both respect a partition `C`,
+    then their union `S ∪ T` also respects `C`. -/
+lemma respects_partition_union {S T : Set α} {C : Set (Set α)} (hC : IsPartition C)
+    (hS : RespectsPartition S hC) (hT : RespectsPartition T hC) :
+    RespectsPartition (S ∪ T) hC := by
+  rw [respects_partition_iff_respects_partition'] at *
+  simp [RespectsPartition'] at *
+  grind
 
 /-- If two sets `S` and `T` each respect a partition induced by some finite set,
     then their union `S ∪ T` also respects a partition induced by some finite set. -/
@@ -390,6 +537,18 @@ lemma respects_partition_of_union {S T : Set α}
     (hS : ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A))
     (hT : ∃ (B : Finset α), RespectsPartition T (finset_to_partition_is_partition B)) :
     ∃ (C : Finset α), RespectsPartition (S ∪ T) (finset_to_partition_is_partition C) := by
+  rcases hS with ⟨A, hA⟩
+  rcases hT with ⟨B, hB⟩
+  use A ∪ B
+  have hA' : A ⊆ A ∪ B := Finset.subset_union_left
+  have hB' : B ⊆ A ∪ B := Finset.subset_union_right
+  apply respects_partition_union
+  · exact respects_partition_of_subset hA' hA
+  · exact respects_partition_of_subset hB' hB
+
+/-- If a set `S` is a component, then it respects a partition induced by some finite set. -/
+lemma respects_partition_of_is_component {S : Set α} (hS : IsComponent S) :
+  ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A) := by
   sorry
 
 /-- For any semialgebraic set `S`, there exists some finite set `A`
