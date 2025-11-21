@@ -9,6 +9,8 @@ import Mathlib.Topology.Order.Basic
 import Mathlib.Topology.Order.DenselyOrdered
 import Mathlib.Topology.Closure
 import Mathlib.Data.Setoid.Partition
+import Mathlib.Data.Nat.Lattice
+import Mathlib.Tactic.Linarith
 
 open Set Setoid
 
@@ -66,7 +68,7 @@ lemma frontier_subset_union (s t : Set α) : frontier (s ∪ t) ⊆ frontier s �
 
 omit [Nonempty α] in
 /-- A semialgebraic set has a finite frontier. -/
-theorem finite_frointer_of_semialgebriac_set {S : Set α} (h : IsSemialgebraic S) :
+theorem finite_frontier_of_semialgebriac_set {S : Set α} (h : IsSemialgebraic S) :
   (frontier S).Finite := by
   classical
   obtain ⟨F, hF, hS⟩ := h
@@ -90,7 +92,7 @@ lemma infinite_semialgebriac_set_iff_nonempty_interior (h : IsSemialgebraic S) :
   constructor <;> intro h'
   · rw [← self_diff_frontier]
     have : (S \ frontier S).Infinite :=
-      Infinite.diff h' (finite_frointer_of_semialgebriac_set h)
+      Infinite.diff h' (finite_frontier_of_semialgebriac_set h)
     exact Set.Infinite.nonempty this
   · haveI : Nontrivial α := inferInstance
     obtain ⟨a,b,hab,Iab⟩ := IsOpen.exists_Ioo_subset (isOpen_interior) h'
@@ -101,7 +103,7 @@ lemma infinite_semialgebriac_set_iff_nonempty_interior (h : IsSemialgebraic S) :
 noncomputable def frontier_of_semialgebriac_set_to_list
   (S : Set α) (hS : IsSemialgebraic S) :
   List α := by
-    have : (frontier S).Finite := finite_frointer_of_semialgebriac_set hS
+    have : (frontier S).Finite := finite_frontier_of_semialgebriac_set hS
     let ffs : Finset α := Finite.toFinset this
     exact ffs.sort (· ≤ ·)
 
@@ -129,6 +131,90 @@ open intervals and singletons determined by the points in `F`.
 -/
 noncomputable def finset_to_partition (F : Finset α) : Set (Set α) :=
   sequence_to_partition (Finset.orderEmbOfFin F (rfl)) (OrderEmbedding.strictMono (Finset.orderEmbOfFin F (rfl)))
+
+/-- The partition induced by an empty set is `{univ}`. -/
+@[simp]
+lemma finset_to_partition_empty : finset_to_partition (∅ : Finset α) = {univ} := by grind
+
+/--
+A set `S` belongs to the partition induced by a non-empty finite set `F` if and only if:
+1. `S` is a singleton `{a}` for some `a ∈ F`.
+2. `S` is the interval `Iio (min' F hF)`.
+3. `S` is the interval `Ioi (max' F hF)`.
+4. `S` is an interval `Ioo a b` where `a < b`, `a, b ∈ F` and there is no element of `F`
+   strictly between `a` and `b`.
+-/
+theorem mem_finset_to_partition_iff {F : Finset α} (hF : F.Nonempty) {S : Set α} :
+  S ∈ finset_to_partition F ↔
+  S = Ioi (F.max' hF) ∨
+  S = Iio (F.min' hF) ∨
+  (∃ a ∈ F, S = {a}) ∨
+  (∃ a ∈ F, ∃ b ∈ F, a < b ∧ S = Ioo a b ∧ ¬∃ c ∈ F, a < c ∧ c < b) := by
+  have hcard := Finset.card_pos.mpr hF
+  rw [finset_to_partition, sequence_to_partition.eq_def]
+  split
+  · omega
+  rename_i n f hf heq₁ heq₂ heq₃
+  simp
+  have emb_range: range (F.orderEmbOfFin rfl) = F := Finset.range_orderEmbOfFin F rfl
+  have f_range : range f = F := by grind
+  have f_range' : ∀ i, f i ∈ F := by simp [← Finset.mem_coe, ← f_range]
+  have f_sur : ∀ x ∈ F, ∃ i, f i = x := by
+    intro x hx
+    simpa [← Finset.mem_coe, ←f_range] using hx
+  have f_last : f (Fin.last n) = F.max' hF := by
+    symm
+    rw [Finset.max'_eq_iff F hF (f (Fin.last n))]
+    constructor
+    · exact f_range' (Fin.last n)
+    · intro b hb
+      obtain ⟨i,rfl⟩ := f_sur b hb
+      exact hf.monotone (Fin.le_last i)
+  have f_zero : f 0 = F.min' hF := by
+    symm
+    rw [Finset.min'_eq_iff F hF (f 0)]
+    constructor
+    · exact f_range' 0
+    · intro b hb
+      obtain ⟨i,rfl⟩ := f_sur b hb
+      exact hf.monotone (Fin.zero_le i)
+  rw [f_last, f_zero]
+  congr!
+  · constructor <;> intro h
+    · obtain ⟨i,rfl⟩ := h
+      use (f i), f_range' i
+    · obtain ⟨x,hx,rfl⟩ := h
+      obtain ⟨i,rfl⟩ := f_sur x hx
+      use i
+  · constructor <;> intro h
+    · obtain ⟨i,rfl⟩ := h
+      use f i.castSucc, f_range' i.castSucc, f i.succ, f_range' i.succ, hf (Fin.castSucc_lt_succ i),rfl
+      intro x hx hfx
+      obtain ⟨j,rfl⟩ := f_sur x hx
+      rw [hf.lt_iff_lt] at hfx
+      exact hf.monotone hfx
+    · obtain ⟨a,ha,b,hb,hab,rfl,hFab⟩ := h
+      obtain ⟨i,rfl⟩ := f_sur a ha
+      obtain ⟨j,rfl⟩ := f_sur b hb
+      have hi : i < Fin.last n := by
+        rw [hf.lt_iff_lt] at hab
+        exact lt_of_lt_of_le hab (Fin.le_last j)
+      use i.castLT hi
+      simp
+      congr
+      have : ((i.castLT hi).succ).val = ((i.castLT hi).val).succ := rfl
+      refine Fin.eq_of_val_eq ?_
+      rw [this] ; simp
+      have hij : i < j ∧ ∀ k, i < k → j ≤ k := by
+        use hf.lt_iff_lt.mp hab
+        intro k hik
+        apply hf.le_iff_le.mp
+        exact hFab (f k) (f_range' k) (hf.lt_iff_lt.mpr hik)
+      apply le_antisymm
+      · exact Nat.succ_le_of_lt hij.1
+      · let k := (i.castLT hi).succ
+        have hik : i < k := by simp [k, Fin.lt_iff_val_lt_val]
+        apply hij.2 k hik
 
 lemma disjoint_of_ne {A B : Set α} (h_ne : A ≠ B)
   (hA : A ∈ sequence_to_partition f hf) (hB : B ∈ sequence_to_partition f hf) :
@@ -546,19 +632,25 @@ lemma respects_partition_of_union {S T : Set α}
   · exact respects_partition_of_subset hA' hA
   · exact respects_partition_of_subset hB' hB
 
+/-- The partition induced by a singleton set `{a}` is `{{a}, Iio a, Ioi a}`. -/
+lemma finset_to_partition_singleton (a : α) :
+  finset_to_partition {a} = {{a}, Iio a, Ioi a} := by
+  rw [finset_to_partition, sequence_to_partition]
+  simp ; ext X ; simp
+  have := Finset.orderEmbOfFin_singleton a 0
+  grind
+
 /-- A singleton set respects the partition induced by itself. -/
 lemma respects_partition_singleton (a : α) :
   RespectsPartition {a} (finset_to_partition_is_partition {a}) := by
   rw [respects_partition_iff_respects_partition', RespectsPartition']
   intro X hX
-  rcases hX with ((h | h) | rfl) | rfl
-  · simp at h ; subst h ; left ; simp
-    exact Finset.orderEmbOfFin_singleton a 0
-  · simp at h
-  · right ; simp ; apply le_of_eq
-    exact Finset.orderEmbOfFin_singleton a 0
-  · right ; simp ; apply le_of_eq ; symm
-    exact Finset.orderEmbOfFin_singleton a 0
+  rw [finset_to_partition_singleton] at hX
+  simp only [mem_insert_iff, mem_singleton_iff] at hX
+  rcases hX with rfl | rfl | rfl
+  · left; simp
+  · right; simp [disjoint_singleton_right]
+  · right; simp [disjoint_singleton_right]
 
 /-- If a set `S` is a component, then it respects a partition induced by some finite set. -/
 lemma respects_partition_of_is_component {S : Set α} (hS : IsComponent S) :
@@ -567,60 +659,24 @@ lemma respects_partition_of_is_component {S : Set α} (hS : IsComponent S) :
   · use {a}
     exact respects_partition_singleton a
   · use {a,b}
-    rw [respects_partition_iff_respects_partition', RespectsPartition']
+    rw [respects_partition_iff_respects_partition',RespectsPartition']
     intro X hX
     by_cases hab' : a = b
     · simp [hab']
     apply hab.lt_of_ne at hab'
-    rw [finset_to_partition, sequence_to_partition.eq_def] at hX
-    split at hX
-    · grind
-    rename_i n f hf hn heq heq'
-    have : n = 1 := by
-      have : Finset.card {a,b} = 2 := by grind
-      grind
-    subst this
-    have : range (Finset.orderEmbOfFin {a, b} rfl) = ({a,b} : Finset α) := Finset.range_orderEmbOfFin {a, b} rfl
-    have f_range : range f = {a,b} := by grind
-    have h_mono : f 0 < f 1 := hf (by grind)
-    have h0_mem : f 0 ∈ ({a, b} : Set α) := by rw [← f_range]; exact mem_range_self 0
-    have h1_mem : f 1 ∈ ({a, b} : Set α) := by rw [← f_range]; exact mem_range_self 1
-    have f0 : f 0 = a := by grind
-    have f1 : f 1 = b := by grind
-    rcases hX with ((h | h) | rfl) | rfl
-    · simp at h
-      rcases h with h | h <;> right <;> simp [←h, ←f0, ←f1]
-    · simp at h ; rcases h with h | h ; simp [←f0, ←f1]
-    · right ; simp [←f0, ←f1]
-      refine disjoint_left.mpr ?_
-      intro x hx hx'
-      grind
-    · simp [←f0, ←f1] ; right
-      refine disjoint_left.mpr ?_
-      intro x hx hx'
-      grind
+    rw [mem_finset_to_partition_iff (Finset.insert_nonempty a {b})] at hX
+    simp [max_eq_right_of_lt hab', min_eq_left_of_lt hab'] at hX
+    · rcases hX with rfl | rfl | (rfl | rfl) | (⟨hab,rfl⟩|⟨hab,rfl⟩) <;> simp [Disjoint] <;> grind
   · use {a}
     rw [respects_partition_iff_respects_partition', RespectsPartition']
     intro X hX
-    rcases hX with ((h | h) | rfl) | rfl
-    · simp at h ; rw [←h] ; right ; simp ; apply le_of_eq
-      exact Finset.orderEmbOfFin_singleton a 0
-    · simp at h
-    · simp ; right ; apply le_of_eq
-      exact Finset.orderEmbOfFin_singleton a 0
-    · simp ; left ; apply le_of_eq ; symm
-      exact Finset.orderEmbOfFin_singleton a 0
+    rw [finset_to_partition_singleton] at hX
+    rcases hX with rfl | rfl | rfl <;> simp [Disjoint] <;> grind
   · use {a}
     rw [respects_partition_iff_respects_partition', RespectsPartition']
     intro X hX
-    rcases hX with ((h | h) | rfl) | rfl
-    · simp at h ; rw [←h] ; right ; simp ; apply le_of_eq ; symm
-      exact Finset.orderEmbOfFin_singleton a 0
-    · simp at h
-    · simp ; left ; apply le_of_eq
-      exact Finset.orderEmbOfFin_singleton a 0
-    · simp ; right ; apply le_of_eq ; symm
-      exact Finset.orderEmbOfFin_singleton a 0
+    rw [finset_to_partition_singleton] at hX
+    rcases hX with rfl | rfl | rfl <;> simp [Disjoint] <;> grind
   · use ∅
     simp [respects_partition_iff_respects_partition', RespectsPartition']
 
@@ -645,20 +701,154 @@ lemma exists_finset_respects_partition_of_semialgebriac (S : Set α) (hS : IsSem
     simp
     exact respects_partition_of_union (respects_partition_of_is_component hs) (ih hG)
 
-/-- For semialgebraic set `S`, there exists some finite set `A` of minimal size,
-    such that `S` respects the partition induced by `A` -/
-lemma min_card_finset_respects_partition_of_semialgebriac (S : Set α) (hS : IsSemialgebraic S) :
+/-- For a set `S` that respects a partition induced by some finite set,
+    there exists a finite set `A` of minimal size,
+    such that `S` respects the partition induced by `A`. -/
+lemma min_card_finset_respects_partition (S : Set α)
+    (hS : ∃ (A : Finset α), RespectsPartition S (finset_to_partition_is_partition A)) :
   ∃ (A : Finset α),
     RespectsPartition S (finset_to_partition_is_partition A) ∧
     ∀ (B : Finset α),
       RespectsPartition S (finset_to_partition_is_partition B) →
         A.card ≤ B.card := by
-  sorry
+  let C := { n | ∃ A : Finset α, A.card = n ∧ RespectsPartition S (finset_to_partition_is_partition A) }
+  have hC_nonempty : C.Nonempty := by
+    rcases hS with ⟨A, hA⟩
+    exact ⟨A.card, ⟨A, rfl, hA⟩⟩
+  let m := sInf C
+  have hm_in_C : m ∈ C := Nat.sInf_mem hC_nonempty
+  rcases hm_in_C with ⟨A, hA_card, hA_respects⟩
+  use A
+  constructor
+  · exact hA_respects
+  · intro B hB_respects
+    have hB_card_in_C : B.card ∈ C := ⟨B, rfl, hB_respects⟩
+    rw [hA_card]
+    exact csInf_le (OrderBot.bddBelow C) hB_card_in_C
+
+/--
+If a semialgebraic set `S` respects a partition induced by a finite set `F`,
+and there is a point `a` in `F` that is not in the frontier of `S`,
+then `S` still respects the partition induced by `F` with `a` removed.
+-/
+private lemma interior_inter_of_interior_inter_open {T U : Set α} (hU : IsOpen U) (a : α)
+    (ha : a ∈ interior T ∩ U) : a ∈ interior (T ∩ U) := by
+  rcases ha with ⟨haT, haU⟩
+  rw [mem_interior_iff_mem_nhds] at *
+  exact Filter.inter_mem haT (hU.mem_nhds haU)
+
+private lemma interior_compl_inter_of_interior_compl_inter_open {T U : Set α} (hU : IsOpen U) (a : α)
+    (ha : a ∈ interior Tᶜ ∩ U) : a ∈ interior (T ∩ U)ᶜ := by
+  rcases ha with ⟨ha_compl, _⟩
+  rw [mem_interior_iff_mem_nhds] at ha_compl
+  rw [mem_interior_iff_mem_nhds]
+  apply Filter.mem_of_superset ha_compl
+  rw [compl_subset_compl]
+  exact inter_subset_left
+
+lemma respects_partition_of_remove_non_frontier_point
+    (S : Set α) (hS : IsSemialgebraic S)
+    (F : Finset α)
+    (h_respects : RespectsPartition S (finset_to_partition_is_partition F))
+    (a : α) (haF : a ∈ F) (ha_frontier : a ∉ frontier S) :
+    RespectsPartition S (finset_to_partition_is_partition (F.erase a)) := by
+  cases h_card : F.card with
+  | zero =>
+    grind only [usr Finset.card_ne_zero_of_mem]
+  | succ n =>
+    have h'_card : (F.erase a).card = n := by grind
+    rw [respects_partition_iff_respects_partition', RespectsPartition'] at h_respects ⊢
+    intro X hX
+    by_cases hX' : X ∈ finset_to_partition F
+    · exact h_respects X hX'
+    cases n with
+    | zero =>
+      rw [Finset.card_eq_zero.mp h'_card, finset_to_partition, sequence_to_partition] at hX
+      change X = univ at hX
+      have hF : F = {a} := by
+        rw [← Finset.insert_erase haF, Finset.card_eq_zero.mp h'_card]
+        rfl
+      suffices S = univ ∨ S = ∅ from by rw [hX] ; aesop
+      change a ∈ (frontier S)ᶜ at ha_frontier
+      rw [compl_frontier_eq_union_interior] at ha_frontier
+      change a ∈ interior S ∨ a ∈ interior Sᶜ at ha_frontier
+      have F_univ: univ = ⋃₀ (finset_to_partition F) := by
+        simp [hF, finset_to_partition_singleton]
+      rcases ha_frontier with ha_in | ha_out
+      · left
+        obtain ⟨u, v, ⟨hua, hav⟩, h_subset⟩ := mem_nhds_iff_exists_Ioo_subset.mp (mem_interior_iff_mem_nhds.mp ha_in)
+        rw [hF, finset_to_partition_singleton] at h_respects
+        refine eq_univ_of_univ_subset ?_
+        rw [F_univ, hF, finset_to_partition_singleton]
+        refine sUnion_subset ?_
+        intro Y hY
+        refine Or.resolve_right (h_respects Y hY) ?_
+        refine Nonempty.not_disjoint ?_
+        rcases hY with rfl | rfl | rfl
+        · refine singleton_inter_nonempty.mpr ?_
+          exact interior_subset ha_in
+        · rcases exists_between hua with ⟨x, hux, hxa⟩
+          exact ⟨x, hxa, h_subset ⟨hux, lt_trans hxa hav⟩⟩
+        · rcases exists_between hav with ⟨y, hay, hyv⟩
+          exact ⟨y, hay, h_subset ⟨lt_trans hua hay, hyv⟩⟩
+      · right
+        obtain ⟨u, v, ⟨hua, hav⟩, h_subset⟩ := mem_nhds_iff_exists_Ioo_subset.mp (mem_interior_iff_mem_nhds.mp ha_out)
+        rw [hF, finset_to_partition_singleton] at h_respects
+        refine disjoint_univ.mp ?_
+        rw [F_univ, hF, finset_to_partition_singleton]
+        refine disjoint_sUnion_right.mpr ?_
+        intro Y hY ; symm
+        refine Or.resolve_left (h_respects Y hY) ?_
+        refine inter_compl_nonempty_iff.mp ?_
+        rcases hY with rfl | rfl | rfl
+        · refine singleton_inter_nonempty.mpr ?_
+          exact interior_subset ha_out
+        · rcases exists_between hua with ⟨x, hux, hxa⟩
+          exact ⟨x, hxa, h_subset ⟨hux, lt_trans hxa hav⟩⟩
+        · rcases exists_between hav with ⟨y, hay, hyv⟩
+          exact ⟨y, hay, h_subset ⟨lt_trans hua hay, hyv⟩⟩
+    | succ m =>
+    have F'_ne : (F.erase a).Nonempty := by
+      apply Finset.card_pos.mp
+      omega
+    rw [mem_finset_to_partition_iff F'_ne] at hX
+    change a ∈ (frontier S)ᶜ at ha_frontier
+    rw [compl_frontier_eq_union_interior] at ha_frontier
+    change a ∈ interior S ∨ a ∈ interior Sᶜ at ha_frontier
+    rcases hX with rfl | rfl | ⟨x,hx,rfl⟩ | ⟨x,hx,y,hy,hxy,rfl,hxy'⟩
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+
 
 /-- A semialgebraic set respects the partition induced by its finite frontier -/
-lemma semialgebraic_respects_frontier_partition (S : Set α) (hS : IsSemialgebraic S) :
+theorem semialgebraic_respects_frontier_partition (S : Set α) (hS : IsSemialgebraic S) :
     RespectsPartition S (finset_to_partition_is_partition
-      (finite_frointer_of_semialgebriac_set hS).toFinset) := by
-  sorry
+      (finite_frontier_of_semialgebriac_set hS).toFinset) := by
+  -- Get a finite set `F` of minimal cardinality such that `S` respects the partition induced by `F`.
+  obtain ⟨F, h_respects, h_min_card⟩ :=
+    min_card_finset_respects_partition S (exists_finset_respects_partition_of_semialgebriac S hS)
+
+  -- We claim that this minimal set `F` must be a subset of the frontier of `S`.
+  have h_subset_frontier : F ⊆ (finite_frontier_of_semialgebriac_set hS).toFinset := by
+    -- We prove this by contradiction.
+    -- Suppose there is a point `a` in `F` that is not in the frontier of `S`.
+    intro a haF
+    rw [Set.Finite.mem_toFinset]
+    by_contra ha_not_frontier
+    -- By `respects_partition_of_remove_non_frontier_point`, `S` still respects the partition
+    -- induced by `F` with `a` removed.
+    have h_respects_erase : RespectsPartition S (finset_to_partition_is_partition (F.erase a)) := by
+      exact respects_partition_of_remove_non_frontier_point S hS F h_respects a haF ha_not_frontier
+
+    -- This contradicts the minimality of `F`'s cardinality.
+    have h_card_lt : (F.erase a).card < F.card := Finset.card_erase_lt_of_mem haF
+    have h_card_le : F.card ≤ (F.erase a).card := h_min_card (F.erase a) h_respects_erase
+    linarith
+
+  -- Since `S` respects the partition induced by `F` and `F` is a subset of the frontier,
+  -- `S` must also respect the partition induced by the frontier itself.
+  exact respects_partition_of_subset h_subset_frontier h_respects
 
 end Semialgebraic
