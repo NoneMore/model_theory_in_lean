@@ -2,10 +2,11 @@ import Mathlib.ModelTheory.Order
 import Aesop
 import ModelTheoryInLean.Ominimal.Semialgebriac.Basic
 import ModelTheoryInLean.Definability
+import Mathlib.Data.Set.Function
 
 namespace Ominimal
 
-open FirstOrder FirstOrder.Language Semialgebraic Set
+open FirstOrder FirstOrder.Language Semialgebraic Set Setoid
 
 class OminimalStrucuture (L : Language) [L.IsOrdered]
   (M : Type*) [L.Structure M] [LinearOrder M] [M ⊨ L.dlo] : Prop where
@@ -53,7 +54,7 @@ lemma open_intervals_univ_definable (I : Set M)
     exact ⟨h1, h2⟩
 
 lemma cofinite_definable_subset_of_open_interval (I D : Set M)
-  (hI : ∃ (a b : M), a < b∧ I = Ioo a b)
+  (hI : ∃ (a b : M), a < b ∧ I = Ioo a b)
   (hD : UDefinable₁ L D) (hID : I ⊆ closure D)
   [OminimalStrucuture L M] : (I \ D).Finite := by
   rcases hI with ⟨a,b,hab,Iab⟩
@@ -100,5 +101,64 @@ lemma cofinite_definable_subset_of_open_interval (I D : Set M)
     use a,b
   rw [UDefinable₁] at *
   exact Set.Definable.sdiff hI hD
+
+/--
+A definable function with a finite range is constant on each component of a partition
+induced by some finite set.
+-/
+lemma definable_fun_const_on_partition_of_finite_range [OminimalStrucuture L M]
+    {f : M → M} (hf_def : UDefinableFun L (univ.restrict f))
+    (hf_finite : (range f).Finite) :
+    ∃ (F : Finset M), ∀ C ∈ finset_to_partition F, ∃ c, ∀ x ∈ C, f x = c := by
+  classical
+  -- For each s in the range of f, the fiber f⁻¹' {s} is a definable set.
+  have h_fiber_def : ∀ s, UDefinable₁ L (f⁻¹' {s}) := by
+    intro s
+    have fiber_eq : f⁻¹' {s} = Subtype.val '' (univ.restrict f ⁻¹' {s}) := by { ext x; simp [restrict] }
+    rw [fiber_eq]
+    exact udefinable_fiber_of_UDefFun L hf_def s
+
+  -- The set F is the union of the frontiers of all fibers.
+  let F_set := ⋃ s ∈ range f, frontier (f⁻¹' {s})
+  -- Since the range is finite and in an o-minimal structure, definable sets (the fibers)
+  -- are semialgebraic with finite frontiers, F_set is finite.
+  have hF_finite : F_set.Finite :=
+    Finite.biUnion hf_finite fun s _ =>
+      finite_frontier_of_semialgebriac_set (OminimalStrucuture.definable_is_semialgebraic _ (h_fiber_def s))
+  let F := hF_finite.toFinset
+  use F
+
+  -- Now, we show f is constant on each cell C of the partition induced by F.
+  intro C hC_part
+  obtain ⟨x, hx_in_C⟩ := nonempty_of_mem_partition (finset_to_partition_is_partition F) hC_part
+  let c := f x
+  use c
+
+  -- The fiber S is semialgebraic.
+  let S := f⁻¹' {c}
+  have hS_sa : IsSemialgebraic S := OminimalStrucuture.definable_is_semialgebraic _ (h_fiber_def c)
+
+  -- A semialgebraic set respects the partition induced by its frontier.
+  have h_respects_F : RespectsPartition S (finset_to_partition_is_partition F) := by
+    refine respects_partition_of_subset ?_ (semialgebraic_respects_frontier_partition S hS_sa)
+    -- Proof that frontier S ⊆ F.toSet
+    intro a ha_in_frontier_S
+    simp [S, c] at ha_in_frontier_S
+    simp [F,F_set]
+    use x
+
+  -- For any cell C, either C ⊆ S or C is disjoint from S.
+  rw [respects_partition_iff_respects_partition'] at h_respects_F
+  specialize h_respects_F C hC_part
+
+  -- Since x ∈ C and f(x) = c (so x ∈ S), C and S are not disjoint.
+  have h_nondisjoint : (C ∩ S).Nonempty := ⟨x, hx_in_C, rfl⟩
+
+  -- Thus, C must be a subset of S, which means for all y ∈ C, f(y) = c.
+  rcases h_respects_F with h_subset | h_disjoint
+  · intro y hy_in_C
+    exact h_subset hy_in_C
+  · exfalso
+    exact h_nondisjoint.ne_empty (disjoint_iff_inter_eq_empty.mp h_disjoint)
 
 end Ominimal

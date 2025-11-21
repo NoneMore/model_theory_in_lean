@@ -617,6 +617,25 @@ lemma respects_partition_union {S T : Set α} {C : Set (Set α)} (hC : IsPartiti
   simp [RespectsPartition'] at *
   grind
 
+/-- If a finite collection of sets `F` all respect a partition `C`,
+    then their union also respects `C`. -/
+lemma respects_partition_sUnion_of_finset {F : Finset (Set α)} {C : Set (Set α)} (hC : IsPartition C)
+    (hF : ∀ S ∈ F, RespectsPartition S hC) :
+    RespectsPartition (⋃ S ∈ F, S) hC := by
+  classical
+  induction F using Finset.induction with
+  | empty =>
+    simp
+    use ∅
+    simp
+  | @insert s G _ ih =>
+    simp
+    apply respects_partition_union hC
+    · exact hF s (Finset.mem_insert_self s G)
+    · apply ih
+      intro S hS
+      exact hF S (Finset.mem_insert_of_mem hS)
+
 /-- If two sets `S` and `T` each respect a partition induced by some finite set,
     then their union `S ∪ T` also respects a partition induced by some finite set. -/
 lemma respects_partition_of_union {S T : Set α}
