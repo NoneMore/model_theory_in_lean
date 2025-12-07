@@ -775,71 +775,34 @@ lemma respects_partition_of_remove_non_frontier_point
   | zero =>
     grind only [usr Finset.card_ne_zero_of_mem]
   | succ n =>
-    have h'_card : (F.erase a).card = n := by grind
-    rw [respects_partition_iff_respects_partition', RespectsPartition'] at h_respects ⊢
+    have hF : F.Nonempty := by apply Finset.card_pos.mp ; omega
+    simp [respects_partition_iff_respects_partition',RespectsPartition'] at *
     intro X hX
     by_cases hX' : X ∈ finset_to_partition F
     · exact h_respects X hX'
-    cases n with
-    | zero =>
-      rw [Finset.card_eq_zero.mp h'_card, finset_to_partition, sequence_to_partition] at hX
-      change X = univ at hX
-      have hF : F = {a} := by
-        rw [← Finset.insert_erase haF, Finset.card_eq_zero.mp h'_card]
-        rfl
-      suffices S = univ ∨ S = ∅ from by rw [hX] ; aesop
-      change a ∈ (frontier S)ᶜ at ha_frontier
-      rw [compl_frontier_eq_union_interior] at ha_frontier
-      change a ∈ interior S ∨ a ∈ interior Sᶜ at ha_frontier
-      have F_univ: univ = ⋃₀ (finset_to_partition F) := by
-        simp [hF, finset_to_partition_singleton]
-      rcases ha_frontier with ha_in | ha_out
-      · left
-        obtain ⟨u, v, ⟨hua, hav⟩, h_subset⟩ := mem_nhds_iff_exists_Ioo_subset.mp (mem_interior_iff_mem_nhds.mp ha_in)
-        rw [hF, finset_to_partition_singleton] at h_respects
-        refine eq_univ_of_univ_subset ?_
-        rw [F_univ, hF, finset_to_partition_singleton]
-        refine sUnion_subset ?_
-        intro Y hY
-        refine Or.resolve_right (h_respects Y hY) ?_
-        refine Nonempty.not_disjoint ?_
-        rcases hY with rfl | rfl | rfl
-        · refine singleton_inter_nonempty.mpr ?_
-          exact interior_subset ha_in
-        · rcases exists_between hua with ⟨x, hux, hxa⟩
-          exact ⟨x, hxa, h_subset ⟨hux, lt_trans hxa hav⟩⟩
-        · rcases exists_between hav with ⟨y, hay, hyv⟩
-          exact ⟨y, hay, h_subset ⟨lt_trans hua hay, hyv⟩⟩
-      · right
-        obtain ⟨u, v, ⟨hua, hav⟩, h_subset⟩ := mem_nhds_iff_exists_Ioo_subset.mp (mem_interior_iff_mem_nhds.mp ha_out)
-        rw [hF, finset_to_partition_singleton] at h_respects
-        refine disjoint_univ.mp ?_
-        rw [F_univ, hF, finset_to_partition_singleton]
-        refine disjoint_sUnion_right.mpr ?_
-        intro Y hY ; symm
-        refine Or.resolve_left (h_respects Y hY) ?_
-        refine inter_compl_nonempty_iff.mp ?_
-        rcases hY with rfl | rfl | rfl
-        · refine singleton_inter_nonempty.mpr ?_
-          exact interior_subset ha_out
-        · rcases exists_between hua with ⟨x, hux, hxa⟩
-          exact ⟨x, hxa, h_subset ⟨hux, lt_trans hxa hav⟩⟩
-        · rcases exists_between hav with ⟨y, hay, hyv⟩
-          exact ⟨y, hay, h_subset ⟨lt_trans hua hay, hyv⟩⟩
-    | succ m =>
-    have F'_ne : (F.erase a).Nonempty := by
-      apply Finset.card_pos.mp
-      omega
-    rw [mem_finset_to_partition_iff F'_ne] at hX
+    let Xl := Iio a ∩ X
+    let Xr := Ioi a ∩ X
+    have haX : a ∈ X := by sorry
+    have hXp : X = ⋃₀ {{a}, Xl, Xr} := by simp [Xl,Xr] ; grind
+    rw [hXp]
+    have hXpF : {{a}, Xl, Xr} ⊆ finset_to_partition F := by
+      intro Y hY
+      rcases hY with rfl | rfl | rfl <;> rw [mem_finset_to_partition_iff hF]
+      · right ; right ; left ; use a
+      · sorry
+      · sorry
     change a ∈ (frontier S)ᶜ at ha_frontier
     rw [compl_frontier_eq_union_interior] at ha_frontier
     change a ∈ interior S ∨ a ∈ interior Sᶜ at ha_frontier
-    rcases hX with rfl | rfl | ⟨x,hx,rfl⟩ | ⟨x,hx,y,hy,hxy,rfl,hxy'⟩
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-
+    rcases ha_frontier with ha_in | ha_out
+    · left ; refine sUnion_subset ?_ ; intro Y hY
+      apply Or.resolve_right (h_respects Y (hXpF hY))
+      refine Nonempty.not_disjoint ?_
+      sorry
+    · right ; refine disjoint_sUnion_left.mpr ?_ ; intro Y hY
+      apply Or.resolve_left (h_respects Y (hXpF hY))
+      refine inter_compl_nonempty_iff.mp ?_
+      sorry
 
 /-- A semialgebraic set respects the partition induced by its finite frontier -/
 theorem semialgebraic_respects_frontier_partition (S : Set α) (hS : IsSemialgebraic S) :
