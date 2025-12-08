@@ -86,6 +86,18 @@ lemma definable_exists {L : Language} [L.Structure M] {n : ℕ} {p : (Fin (n + 1
     ext i
     cases i using Fin.lastCases with simp
 
+lemma _root_.Set.Definable.specialize_last {L : Language} [L.Structure M]
+    {A : Set M} {n : ℕ} {S : Set (Fin (n + 1) → M)}
+    (hS : A.Definable L S) (a : A) :
+    A.Definable L {v : Fin n → M | Fin.snoc v a ∈ S} := by
+  obtain ⟨φ, hφ⟩ := hS
+  let f : Fin (n + 1) → L[[↑A]].Term (Fin n) := Fin.lastCases (L.con a).term (Term.var)
+  use (φ.subst f)
+  ext v ; simp [hφ,Formula.Realize]
+  apply iff_of_eq ; congr
+  ext i
+  induction i using Fin.lastCases <;> simp [f]
+
 /-- The fiber of a definable (partial) function is definable. -/
 lemma udefinable_fiber_of_UDefFun {A : Set M} {f : A → M} (f_def : L.UDefinableFun f) (b : M) :
     UDefinable₁ L (Subtype.val '' {x | f x = b}) := by

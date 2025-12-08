@@ -188,7 +188,7 @@ theorem mem_finset_to_partition_iff {F : Finset α} (hF : F.Nonempty) {S : Set �
       use i
   · constructor <;> intro h
     · obtain ⟨i,rfl⟩ := h
-      use f i.castSucc, f_range' i.castSucc, f i.succ, f_range' i.succ, hf (Fin.castSucc_lt_succ i),rfl
+      use f i.castSucc, f_range' i.castSucc, f i.succ, f_range' i.succ, hf (Fin.castSucc_lt_succ),rfl
       intro x hx hfx
       obtain ⟨j,rfl⟩ := f_sur x hx
       rw [hf.lt_iff_lt] at hfx
@@ -371,7 +371,7 @@ lemma sequence_to_partition_is_partition :
       intro i
       refine nonempty_iff_ne_empty'.mp (nonempty_Ioo_subtype ?_)
       apply hf
-      exact Fin.castSucc_lt_succ i
+      exact Fin.castSucc_lt_succ
 
 lemma finset_to_partition_is_partition (F : Finset α) :
   IsPartition (finset_to_partition F) := by

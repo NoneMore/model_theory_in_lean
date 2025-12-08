@@ -37,13 +37,7 @@ omit [TopologicalSpace M] [OrderTopology M] [DenselyOrdered M]
 [NoMinOrder M] [NoMaxOrder M] [Nonempty M] in
 lemma definable_lt_con (a : M) :
     univ.Definable L {v : Fin 1 → M | v 0 < a} := by
-  let p : (Fin 2 → M) → Prop := fun v => v 0 < v 1 ∧ v 1 = a
-  have S_def : univ.Definable L { v : Fin 2 → M | p v }:= by
-    apply Definable.inter definable_lt
-    apply Definable.preimage_comp ![1] (definable_con a)
-  let S'_def := definable_exists S_def
-  convert S'_def using 1
-  aesop
+  convert Definable.specialize_last definable_lt ⟨a,(by trivial)⟩ <;> assumption
 
 omit [TopologicalSpace M] [OrderTopology M] [DenselyOrdered M]
 [NoMinOrder M] [NoMaxOrder M] [Nonempty M] in
