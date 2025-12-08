@@ -92,19 +92,19 @@ lemma comparator_is_definable_of_finite_range {f : M → M} (hf_def : UDefinable
         simp [Set.inter_def] at S₃_def
         convert (definable_exists S₃_def) using 1
         simp [Fin.snoc]
-      have S₂_def : univ.Definable L {v : Fin 2 → M | v 1 = f a} := by
-        apply Definable.preimage_comp ![1] (definable_con (f a))
-      let S_def := Definable.inter S₁_def S₂_def
-      simp [Set.inter_def] at S_def
-      let := definable_exists S_def
-      convert this using 1
-      simp [Fin.snoc]
+      convert Definable.specialize_last S₁_def ⟨f a, trivial⟩
     convert S_def using 1
     ext v
+    simp [comparator] ; split_ifs with hf <;> simp
+  · simp [UDefinableFun, UDefinable₂, Definable₂] at hf_def
+    have : univ.Definable L {x : Fin 1 → M | f (x 0) = f a} :=
+      Definable.specialize_last hf_def ⟨f a, trivial⟩
+    convert this using 1
+    ext v
     simp [comparator] ; split_ifs with hf
-    · grind
-    grind
-  · sorry
+    · simp ; exact ne_of_lt hf
+    · simpa
+    · simpa
   · sorry
 
 theorem UDefinable₁.eventually_right {p : M → Prop} (p_def : UDefinable₁ L {x | p x}) : UDefinable₁ L {(x : M) | eventuallyRight p x} := by
