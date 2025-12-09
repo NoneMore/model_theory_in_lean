@@ -1,3 +1,1 @@
 import ModelTheoryInLean.Definability
-import ModelTheoryInLean.Ominimal.Basic
-import ModelTheoryInLean.Ominimal.Semialgebriac.Basic
