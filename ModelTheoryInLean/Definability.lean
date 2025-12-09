@@ -1,119 +1,79 @@
 import Mathlib.ModelTheory.Definability
 
-open Set
-/-
-TODO:
-1.  Defining Formula
-    -   `IsDefiningFormula {L : Language} (φ : L.Formula (Fin 2)) : Prop`
-    -   A binary formula `φ(x, y)` is a defining formula iff for any `x, y₁, y₂`, `φ(x, y₁) ∧ φ(x, y₂)` implies `y₁ = y₂`.
-    -   Implementation: `∀ (x y₁ y₂ : M), (Realize φ ![x, y₁]) ∧ (Realize φ ![x, y₂]) → y₁ = y₂`
+namespace FirstOrder.Language.Definable
 
-2.  Domain and Range
-    -   `domain {L : Language} (φ : L.Formula (Fin 2)) : Set M`
-    -   `range {L : Language} (φ : L.Formula (Fin 2)) : Set M`
-    -   Implementation:
-        -   `domain φ := {x | ∃ y, Realize φ ![x, y]}`
-        -   `range φ := {y | ∃ x, Realize φ ![x, y]}`
+open FirstOrder Language Set
 
-3.  Function from a Defining Formula
-    -   `funOfDefiningFormula {L : Language} {φ : L.Formula (Fin 2)} (hφ : IsDefiningFormula φ) : (domain φ) → (range φ)`
-    -   Implementation: Use `Classical.choose` on `∃ y, Realize φ ![x, y]`. Uniqueness is guaranteed by `IsDefiningFormula`.
+variable {M : Type*} {L : Language} [L.Structure M] {α : Type*} {β : Type*}
 
-4.  (Proposition) The constructed function is UDefinable_fun
-    -   `funOfDefiningFormula_is_UDefinable : UDefinable_fun (funOfDefiningFormula hφ)`
-    -   Implementation: Prove the graph of the function, `{ (x, y) | x ∈ domain φ ∧ y = (funOfDefiningFormula hφ) x }`, is a definable set. This set is equivalent to the set defined by `φ`.
+def DefinableFun (L : Language) [L.Structure M] (A : Set M) (f : (α → M) → M) : Prop :=
+  A.Definable L {v : ((α ⊕ Unit) → M)  | f (v ∘ Sum.inl) = v (Sum.inr ())}
 
-5.  Generalization to n-ary functions
-    -   `IsNaryDefiningFormula {L : Language} (n : ℕ) (φ : L.Formula (Fin (n + 1))) : Prop`
-    -   `naryDomain {L : Language} {n : ℕ} (φ : L.Formula (Fin (n + 1))) : Set (Fin n → M)`
-    -   `naryRange {L : Language} {n : ℕ} (φ : L.Formula (Fin (n + 1))) : Set M`
-    -   `funOfNaryDefiningFormula`
-    -   `funOfNaryDefiningFormula_is_UDefinable`
-    -   Implementation: Replace `x` with a vector of type `Fin n → M`.
+theorem definable_fun_of_fun_symbol {n : ℕ} (f : L.Functions n) :
+    DefinableFun L (∅ : Set M) (fun x : Fin n → M => Structure.funMap f x) := by
+  refine empty_definable_iff.mpr ?_
+  let t_out : L.Term (Fin n ⊕ Unit) := Term.var (Sum.inr ())
+  let t_in  : Fin n → L.Term (Fin n ⊕ Unit) := fun i => Term.var (Sum.inl i)
+  let φ := (Term.func f t_in).equal t_out
+  use φ ; ext v ; simp [φ, t_in, t_out, Function.comp_def]
 
-6.  Indicator Function
-    -   `noncomputable indicator {M : Type*} (p : M → Prop) (a : M) : ℤ`
-    -   Implementation: `if p a then 1 else 0`.
+theorem definable_fun_of_term (t : L.Term α) :
+    DefinableFun L (∅ : Set M) (fun v => t.realize v) := by
+  refine empty_definable_iff.mpr ?_
+  let t_lifted : L.Term (α ⊕ Unit) := t.relabel Sum.inl
+  let t_out : L.Term (α ⊕ Unit) := Term.var (Sum.inr ())
+  let φ := t_lifted.equal t_out
+  use φ ; ext v ; simp [φ, t_lifted, t_out]
 
-7.  Comparator Function
-    -   `comparator {M : Type*} [LinearOrder M] (a b : M) : ℤ`
-    -   Implementation: `match cmp a b with | Ordering.lt => -1 | Ordering.eq => 0 | Ordering.gt => 1`.
--/
+def DefinableMap (L : Language) [L.Structure M] (A : Set M) (F : (α → M) → (β → M)) : Prop :=
+  ∀ i : β, DefinableFun L A (fun x => F x i)
 
-namespace FirstOrder.Language
-
-open FirstOrder Language
-
-variable {M : Type*} (L : Language) [L.Structure M]
-
-def UDefinable₁ (s : Set M) : Prop :=
-  univ.Definable₁ L s
-
-def UDefinable₂ (s : Set (M × M)) : Prop :=
-  (univ : Set M).Definable₂ L s
-
-/-- A function `f : A → M` is U-definable if its graph is a U-definable set. -/
-def UDefinableFun {A : Set M} (f : A → M) : Prop :=
-  UDefinable₂ L ((fun (a : A) => (a.val, f a)) '' univ)
-
-/-- A function `f : M → S` is definable if for every `s : S`, the preimage `f⁻¹' {s}` is a U-definable set. -/
-def DefinableFunOfFiniteRange {S : Type*} (f : M → S) : Prop :=
-  ∀ s : S, UDefinable₁ L (f⁻¹' {s})
-
-lemma definable_con {L : Language} [L.Structure M] (a : M) :
-    univ.Definable L {v : Fin 1 → M | v 0 = a} := by
-  rw [Set.definable_iff_exists_formula_sum]
-  let tx : L.Term ((↑univ : Set M) ⊕ Fin 1) :=
-    Term.var (Sum.inr (0 : Fin 1))
-  let ta : L.Term ((↑univ : Set M) ⊕ Fin 1) :=
-    Term.var (Sum.inl ⟨a,trivial⟩)
-  use Term.equal tx ta
-  simp [Term.realize, tx, ta]
-
-lemma definable_exists {L : Language} [L.Structure M] {n : ℕ} {p : (Fin (n + 1) → M) → Prop}
-  {A : Set M} (p_def : A.Definable L {v | p v}) :
-    A.Definable L { v : Fin n → M | ∃ x, p (Fin.snoc v x)} := by
-  convert p_def.image_comp (Fin.castSucc)
-  ext v
-  simp only [mem_setOf_eq, mem_image]
-  constructor
-  · intro ⟨x, hx⟩
-    refine ⟨_, hx, ?_⟩
-    simp
-  · rintro ⟨x, h, rfl⟩
-    exists x (Fin.last n)
-    convert h
-    ext i
-    cases i using Fin.lastCases with simp
-
-lemma _root_.Set.Definable.specialize_last {L : Language} [L.Structure M]
-    {A : Set M} {n : ℕ} {S : Set (Fin (n + 1) → M)}
-    (hS : A.Definable L S) (a : A) :
-    A.Definable L {v : Fin n → M | Fin.snoc v a ∈ S} := by
+lemma definable_exists_fintype [Finite β] {A : Set M} {S : Set ((α ⊕ β) → M)}
+    (hS : A.Definable L S) :
+    A.Definable L { v : α → M | ∃ u : β → M, Sum.elim v u ∈ S } := by
   obtain ⟨φ, hφ⟩ := hS
-  let f : Fin (n + 1) → L[[↑A]].Term (Fin n) := Fin.lastCases (L.con a).term (Term.var)
-  use (φ.subst f)
-  ext v ; simp [hφ,Formula.Realize]
-  apply iff_of_eq ; congr
-  ext i
-  induction i using Fin.lastCases <;> simp [f]
+  use φ.iExs β
+  ext v ; simp [hφ]
 
-/-- The fiber of a definable (partial) function is definable. -/
-lemma udefinable_fiber_of_UDefFun {A : Set M} {f : A → M} (f_def : L.UDefinableFun f) (b : M) :
-    UDefinable₁ L (Subtype.val '' {x | f x = b}) := by
-  simp [UDefinable₁,Definable₁]
-  simp [UDefinableFun, UDefinable₂, Definable₂, Definable] at f_def
-  choose φ hφ using f_def
-  have : univ.Definable L {v : Fin 1 → M | ∃ y, φ.Realize (Fin.snoc v y) ∧ y = b} := by
-    have : univ.Definable L {v : Fin 2 → M | φ.Realize v} := by
-      simp [Definable] ; use φ
-    let S_def := (Definable.inter this (Definable.preimage_comp ![1] (definable_con b)))
-    simp [Set.inter_def] at S_def
-    let S'_def := definable_exists S_def
-    convert S'_def
-  convert this using 1
+lemma definable_preimage_of_definableMap
+    {α β : Type} [Finite β] {A : Set M}
+    {F : (α → M) → (β → M)} (hF : DefinableMap L A F)
+    {S : Set (β → M)} (hS : A.Definable L S) :
+    A.Definable L { v : α → M | F v ∈ S } := by
+  letI := Fintype.ofFinite β
+  let graph := { w : α ⊕ β → M | ∀ i, (F (w ∘ Sum.inl)) i = w (Sum.inr i) }
+  have h_graph : A.Definable L graph := by
+    simp [graph]
+    rw [setOf_forall fun i x ↦ F (x ∘ Sum.inl) i = x (Sum.inr i)]
+    have : ∀ i, A.Definable L {x | F (x ∘ Sum.inl) i = x (Sum.inr i)} := by
+      intro i
+      specialize hF i
+      simp [DefinableFun] at hF
+      let f : α ⊕ Unit → α ⊕ β := Sum.map id (fun _ ↦ i)
+      convert hF.preimage_comp f using 1
+    convert definable_biInter_finset this (Finset.univ) using 1
+    simp
+  have h_cyl : A.Definable L { w : α ⊕ β → M | w ∘ Sum.inr ∈ S } :=
+    hS.preimage_comp Sum.inr
+  have hS' := definable_exists_fintype (Definable.inter h_graph h_cyl)
+  simp [graph, inter_def] at hS'
+  convert hS' using 1
   ext v ; simp
-  change _ ↔ (Fin.snoc v b) ∈ setOf φ.Realize
-  simp [←hφ,Fin.snoc]
+  constructor
+  · intro h ; use (F v) ; grind
+  · rintro ⟨u,hFv,hu⟩
+    have : F v = u := by exact (eqOn_univ (F v) u).mp fun ⦃x⦄ a ↦ hFv x
+    rwa [this]
 
-end FirstOrder.Language
+-- def subst_map (Vars : β → Type*) (F : ∀ i, (Vars i → M) → M)
+--     (w : α ⊕ (Σ i, Vars i) → M) : α ⊕ β → M :=
+--   fun x => match x with
+--   | Sum.inl a => w (Sum.inl a)
+--   | Sum.inr b => F b (fun g => w (Sum.inr ⟨b, g⟩))
+
+-- theorem definable_subst [Finite β] {S : Set (α ⊕ β → M)} {A :Set M} (hS : A.Definable L S)
+--     (Vars : β → Type*) (F : ∀ i : β, (Vars i → M) → M) (hF : DefinableMap L A (subst_map Vars F)) :
+--     A.Definable L { w : α ⊕ (Σ i, Vars i) → M | subst_map Vars F w ∈ S } := by
+--   sorry
+
+end FirstOrder.Language.Definable
