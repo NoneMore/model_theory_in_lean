@@ -100,7 +100,7 @@ end
 section parition
 
 lemma card_filter_lt_orderEmbOfFin (F : Finset α) (k : Fin (F.card)) :
-    (F.filter (· < F.orderEmbOfFin rfl k)).card = k.val := by
+    (F.filter (· < F.orderEmbOfFin rfl k)).card = k := by
   conv =>
     enter [1, 1, 2]
     rw [← F.map_orderEmbOfFin_univ rfl]
@@ -213,7 +213,31 @@ lemma partitionComponent_nonempty (k : Fin (2 * F.card + 1)) :
               obtain ⟨l,hl,rfl⟩ := hx
               simp only [OrderEmbedding.lt_iff_lt, OrderEmbedding.le_iff_le, f] at hxF ⊢
               exact Nat.le_sub_one_of_lt hxF
-        · sorry
+        · have : n = F.card := by omega
+          let m : Fin F.card := ⟨F.card - 1, by omega⟩
+          obtain ⟨y,hy⟩ := exists_gt (f m)
+          use y
+          simp only [partitionComponent, rankFin, rank, mem_setOf_eq]
+          split_ifs with hyF
+          · exfalso
+            rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hyF
+            obtain ⟨l,hl,rfl⟩ := hyF
+            simp [f, m] at hy
+            simp [Fin.lt_def] at hy
+            omega
+          · refine Fin.eq_of_val_eq ?_
+            simp only [add_zero]
+            suffices h : {y_1 ∈ F | y_1 < y}.card = n by
+              rw [h] ; symm ; assumption
+            rw [this]
+            congr 1
+            simp only [Finset.filter_eq_self]
+            intro x hxF
+            rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hxF
+            obtain ⟨l,hl,rfl⟩ := hxF
+            refine lt_of_le_of_lt ?_ hy
+            simp [f]
+            grind
   · simp only [Finset.not_nonempty_iff_eq_empty] at hF
     subst hF
     simp only [partitionComponent, Finset.card_empty, Nat.mul_zero, Nat.reduceAdd, rankFin, rank,
@@ -231,9 +255,14 @@ example : IsPartition (partition_of_finset F) := by
     simp [partitionComponent] at *
     grind
   · simp [partition_of_finset,partitionComponent]
-  · sorry
+  · by_contra
+    simp only [partition_of_finset, mem_range] at this
+    obtain ⟨y,hy⟩ := this
+    have := partitionComponent_nonempty F
+    specialize this y
+    rw [hy] at this
+    exact not_nonempty_empty this
 
 end parition
-
 
 end Semialgebraic
