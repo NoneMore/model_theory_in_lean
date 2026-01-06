@@ -115,6 +115,27 @@ variable (F : Finset α) (x : α)
 def rank : ℕ :=
   2 * (F.filter (fun y => y < x)).card + (if x ∈ F then 1 else 0)
 
+lemma rank_mono : ∀ u v, u ≤ v → rank F u ≤ rank F v := by
+  intro u v huv
+  have : {y ∈ F | y < u}.card ≤ {y ∈ F | y < v}.card := by
+    suffices {y ∈ F | y < u} ⊆ {y ∈ F | y < v} by
+      exact Finset.card_le_card this
+    grind
+  simp only [rank, ge_iff_le]
+  split_ifs
+  · grind
+  · have : {y ∈ F | y < u}.card < {y ∈ F | y < v}.card := by
+      refine Finset.card_lt_card ?_
+      refine Finset.ssubset_iff_subset_ne.mpr ?_
+      refine ⟨by grind, ?_⟩
+      refine Finset.symmDiff_nonempty.mp ?_
+      exists u
+      simp [symmDiff]
+      grind
+    fin_omega
+  · grind
+  · grind
+
 lemma rank_bound : rank F x < 2 * F.card + 1 := by
   simp only [rank]
   split_ifs with hx
@@ -142,20 +163,19 @@ lemma partitionComponent_nonempty (k : Fin (2 * F.card + 1)) :
     (partitionComponent F k).Nonempty := by
   by_cases hF : F.Nonempty
   · rw [← Finset.card_pos] at hF
-    have : NeZero F.card := NeZero.of_pos hF
+    letI : NeZero F.card := NeZero.of_pos hF
     let f := F.orderEmbOfFin rfl
     by_cases hodd : k.val % 2 = 1
     · let n := k.val / 2
       have hn : n < F.card := by omega
-      exists f ⟨n, hn⟩
+      let x := f ⟨n, hn⟩
+      have hx : x ∈ F := by simp [x,f]
+      exists x
       simp only [partitionComponent, rankFin, rank, mem_setOf_eq]
-      split_ifs with hmem
-      · congr 1
-        suffices h : {y ∈ F | y < ↑(f ⟨n, hn⟩)}.card = n by
-          rw [h] ; omega
-        rw [card_filter_lt_orderEmbOfFin]
-      · exfalso
-        exact hmem (Finset.orderEmbOfFin_mem F rfl ⟨n, hn⟩)
+      split_ifs
+      congr 1
+      rw [card_filter_lt_orderEmbOfFin]
+      simp ; omega
     · let n := k.val / 2
       have heven : k.val = 2 * n := by omega
       by_cases hn : n = 0
@@ -184,35 +204,33 @@ lemma partitionComponent_nonempty (k : Fin (2 * F.card + 1)) :
               and_true]
             exact Nat.zero_lt_of_ne_zero hn
           obtain ⟨y,hy⟩ := exists_between lt
-          use y
+          have : y ∉ F := by
+            intro hy'
+            rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hy'
+            obtain ⟨i,hi,rfl⟩ := hy'
+            simp [f] at hy
+            fin_omega
+          exists y
           simp only [partitionComponent, rankFin, mem_setOf_eq]
           ext
           simp only [rank]
-          split_ifs with hy'
-          · rw [heven]
-            exfalso
-            rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hy'
-            obtain ⟨l,hl,rfl⟩ := hy'
-            simp only [OrderEmbedding.lt_iff_lt, f] at hy
-            have : l ≤ ⟨n - 1, by omega⟩ := Nat.le_sub_one_of_lt hy.2
-            omega
-          · suffices h : {y_1 ∈ F | y_1 < y}.card = n by
-              omega
-            rw [show n = (⟨n,hn'⟩ : Fin F.card).val by simp]
-            rw [←card_filter_lt_orderEmbOfFin F ⟨n,hn'⟩]
-            congr 1
-            ext x
-            simp only [Finset.mem_filter, and_congr_right_iff]
-            intro hx
-            constructor
-            · intro hxy
-              refine lt_trans hxy hy.2
-            · intro hxF
-              refine lt_of_le_of_lt ?_ hy.1
-              rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hx
-              obtain ⟨l,hl,rfl⟩ := hx
-              simp only [OrderEmbedding.lt_iff_lt, OrderEmbedding.le_iff_le, f] at hxF ⊢
-              exact Nat.le_sub_one_of_lt hxF
+          split_ifs
+          suffices h : {y_1 ∈ F | y_1 < y}.card = n by omega
+          rw [show n = (⟨n,hn'⟩ : Fin F.card).val by simp]
+          rw [←card_filter_lt_orderEmbOfFin F ⟨n,hn'⟩]
+          congr 1
+          ext x
+          simp only [Finset.mem_filter, and_congr_right_iff]
+          intro hx
+          constructor
+          · intro hxy
+            refine lt_trans hxy hy.2
+          · intro hxF
+            refine lt_of_le_of_lt ?_ hy.1
+            rw [←F.image_orderEmbOfFin_univ rfl, Finset.mem_image] at hx
+            obtain ⟨l,hl,rfl⟩ := hx
+            simp only [OrderEmbedding.lt_iff_lt, OrderEmbedding.le_iff_le, f] at hxF ⊢
+            exact Nat.le_sub_one_of_lt hxF
         · have : n = F.card := by omega
           let m : Fin F.card := ⟨F.card - 1, by omega⟩
           obtain ⟨y,hy⟩ := exists_gt (f m)
@@ -248,7 +266,7 @@ lemma partitionComponent_nonempty (k : Fin (2 * F.card + 1)) :
     simp only [Fin.isValue, mem_setOf_eq]
     exact Eq.symm (Fin.fin_one_eq_zero k)
 
-example : IsPartition (partition_of_finset F) := by
+lemma isPartition_partition_of_finset : IsPartition (partition_of_finset F) := by
   refine PairwiseDisjoint.isPartition_of_exists_of_ne_empty ?_ ?_ ?_
   · rw [pairwiseDisjoint_iff]
     rintro A ⟨k,rfl⟩ B ⟨l,rfl⟩ ⟨x,hx⟩
@@ -262,6 +280,77 @@ example : IsPartition (partition_of_finset F) := by
     specialize this y
     rw [hy] at this
     exact not_nonempty_empty this
+
+lemma rank_insert_of_not_mem {F : Finset α} {a : α} (ha : a ∉ F) :
+    rank (insert a F) x =
+      if x < a then rank F x
+      else if x = a then rank F x + 1
+      else rank F x + 2 := by
+  simp only [rank, Finset.filter_insert]
+  split_ifs <;> grind
+  -- split_ifs with hx_lt hx_eq <;> simp only [rank, Finset.mem_insert]
+  -- · by_cases hx : x ∈ F
+  --   · split_ifs with h
+  --     · cases h
+  --       · grind
+  --       · simp ; congr 1 ; grind
+  --     · grind
+  --   · split_ifs with h
+  --     · cases h <;> grind
+  --     · simp ; congr 1 ; grind
+  -- · by_cases hx : x ∈ F
+  --   · grind
+  --   · split_ifs with h
+  --     · cases h
+  --       · simp only [add_zero, Nat.add_right_cancel_iff, mul_eq_mul_left_iff, OfNat.ofNat_ne_zero,
+  --         or_false]
+  --         congr 1
+  --         ext y
+  --         grind
+  --       · grind
+  --     grind
+  -- · by_cases hx : x ∈ F
+  --   · split_ifs with h
+  --     · simp only [Nat.add_right_cancel_iff]
+  --       cases h
+  --       · grind
+  --       · suffices {y ∈ insert a F | y < x}.card = {y ∈ F | y < x}.card + 1 by omega
+  --         have : a < x := by grind
+  --         rw [Finset.filter_insert, if_pos this, Finset.card_insert_of_notMem]
+  --         grind
+  --     · grind
+  --   · split_ifs with h
+  --     · cases h
+  --       · grind
+  --       · grind
+  --     · suffices {y ∈ insert a F | y < x}.card = {y ∈ F | y < x}.card + 1 by omega
+  --       have : a < x := by grind
+  --       rw [Finset.filter_insert, if_pos this, Finset.card_insert_of_notMem]
+  --       grind
+
+lemma rank_eq_of_rank_insert_eq (a : α) (x y : α) :
+    rank (insert a F) x = rank (insert a F) y → rank F x = rank F y := by
+  intro h
+  by_cases ha : a ∈ F
+  · grind only [= Finset.insert_eq_of_mem]
+  · rw [rank_insert_of_not_mem x ha, rank_insert_of_not_mem y ha] at h
+    split_ifs at h
+    · grind
+    · have := rank_mono F x y (by grind)
+      grind
+    · have := rank_mono F x y (by grind)
+      grind
+    · have := rank_mono F y x (by grind)
+      grind
+    · grind
+    · have := rank_mono F x y (by grind)
+      grind
+    · have := rank_mono F y x (by grind)
+      grind
+    · have := rank_mono F y x (by grind)
+      grind
+    · grind
+
 
 end parition
 
